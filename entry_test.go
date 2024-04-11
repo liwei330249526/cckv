@@ -13,22 +13,20 @@ import (
 //}
 
 
-
-
 func TestEntry(t *testing.T) {
 	key := "liwei"
 	val := "cckv"
 	et := NewEntry([]byte(key), []byte(val))
 	et.mask = 1
 	buf := EnCode(et)
-	
+
 	res := DeCode(buf)
-	resk := make([]byte, res.keySize)
-	resv := make([]byte, res.valSize)
-	copy(resk, buf[10:])
-	copy(resv, buf[10+res.keySize:])
-	res.key = resk
-	res.value = resv
+	reskey := make([]byte, res.keySize)
+	resval := make([]byte, res.valSize)
+	copy(reskey, buf[10:])
+	copy(resval, buf[10+res.keySize:])
+	res.key = reskey
+	res.value = resval
 
 	fmt.Println(et, res, buf)
 }
