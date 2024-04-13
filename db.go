@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/cckvlbs/dep/index"
 )
 
 type DB struct {
 	dFile *DbFile
-	index map[string]int
+	index index.Index
 	dir string
 }
 
@@ -32,7 +34,9 @@ func OpenDb(dir string) *DB {
 
 	db := &DB{ // 返回db句柄
 		dFile: file,
-		index: make(map[string]int),
+		//index: make(map[string]int),
+		//index: index.NewMMap(),
+		index: index.NewMBTree(),
 		dir: dir,
 	}
 
@@ -64,7 +68,8 @@ func (db *DB)loadIndex() error {
 		}
 
 		if et.mask == 1 {
-			db.index[string(et.key)] = pos
+			db.index.Put(et.key, &index.PosInfo{Pos: pos})
+			//db.index[string(et.key)] = pos
 		}
 
 		pos += et.Size()
@@ -83,7 +88,8 @@ func (db *DB)Put(key []byte, val []byte) {
 		return
 	}
 
-	db.index[string(key)] = pos // 建立索引
+	db.index.Put(key, &index.PosInfo{Pos: pos})
+	//db.index[string(key)] = pos // 建立索引
 
 	return
 }
@@ -92,12 +98,13 @@ func (db *DB)Put(key []byte, val []byte) {
 // 问题， db这里怎么知道读结束了？
 //  1 通过返回了nil， 或 加一个err 返回值
 func (db *DB)Get(key []byte) *Entry {
-	if _, ok := db.index[string(key)]; !ok {
+	if db.index.Get(key) == nil {
 		return nil
 	}
-	pos := db.index[string(key)]
 
-	_, resEt := db.dFile.ReadFile(pos)
+	posInf := db.index.Get(key)
+
+	_, resEt := db.dFile.ReadFile(posInf.Pos)
 	if resEt == nil {
 		return nil
 	}
@@ -114,7 +121,9 @@ func (db *DB)Del(key []byte) {
 	if err != nil {
 		return
 	}
-	delete(db.index, string(key))
+
+	db.index.Delete(key)
+	//delete(db.index, string(key))
 	//db.index[string(key)] = pos // 建立索引
 }
 // 日志追加写的，需要定期merge冗余数据
@@ -144,7 +153,9 @@ func (db *DB)Merge() error {
 		}
 
 		if et.mask == 1 {
-			if db.index[string(et.key)] == pos {
+			posInf := db.index.Get(et.key)
+
+			if posInf.Pos == pos {
 				mem = append(mem, et)
 			}
 		}
@@ -156,7 +167,8 @@ func (db *DB)Merge() error {
 	pos = 0
 	for i := 0; i < len(mem); i++ {
 		filet.WriteFile(mem[i])
-		db.index[string(mem[i].key)] = pos
+		db.index.Put(mem[i].key, &index.PosInfo{Pos:pos})
+		//db.index[string(mem[i].key)] = pos
 		pos += mem[i].Size()
 	}
 
