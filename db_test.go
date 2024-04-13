@@ -37,16 +37,21 @@ func TestDB_Merge(t *testing.T) {
 		return
 	}
 
-	db.Put([]byte("li"), []byte("wei"))
-	db.Put([]byte("li"), []byte("wei2"))
-	db.Put([]byte("li"), []byte("wei3"))
-	db.Put([]byte("li"), []byte("wei4"))
-	db.Put([]byte("li"), []byte("wei5"))
-	db.Put([]byte("li"), []byte("wei6"))
+	db.Put([]byte("mydb"), []byte("cckv"))
+	db.Put([]byte("mydb"), []byte("cckv2"))
+	db.Put([]byte("mydb"), []byte("cckv3"))
+	db.Put([]byte("mydb"), []byte("cckv4"))
+	db.Put([]byte("mydb"), []byte("cckv5"))
+	db.Put([]byte("mydb"), []byte("cckv6"))
 	db.Merge()
-	et1 := db.Get([]byte("li"))
+	et1 := db.Get([]byte("mydb"))
 
 	k1 := string(et1.key)
 	v1 := string(et1.value)
 	fmt.Println(k1,v1)
+
+	db.Del([]byte("mydb"))
+	db.Merge()
+	et2 := db.Get([]byte("mydb"))
+	fmt.Println(et2)
 }

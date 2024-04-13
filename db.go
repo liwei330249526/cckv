@@ -101,7 +101,7 @@ func (db *DB)loadIndex() error {
 // Put db写入
 func (db *DB)Put(key []byte, val []byte) {
 	et := NewEntry([]byte(key), []byte(val))
-	et.mask = 1
+	et.mask = OPPUT
 	pos := db.dFile.pos // 用于建立索引
 	err := db.dFile.WriteFile(et)
 	if err != nil {
@@ -135,7 +135,7 @@ func (db *DB)Get(key []byte) *Entry {
 // Del 删除key
 func (db *DB)Del(key []byte) {
 	et := NewEntry([]byte(key), []byte{})
-	et.mask = 1
+	et.mask = OPDEL
 	//pos := db.dFile.pos // 用于索引
 	err := db.dFile.WriteFile(et)
 	if err != nil {
@@ -172,9 +172,12 @@ func (db *DB)Merge() error {
 
 		}
 
-		if et.mask == 1 {
+		if et.mask == OPPUT {
 			posInf := db.index.Get(et.key)
-
+			if posInf == nil {
+				pos += et.Size()
+				continue
+			}
 			if posInf.Pos == pos {
 				mem = append(mem, et)
 			}

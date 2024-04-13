@@ -6,6 +6,7 @@ var (
 	EntryHeadSize = 10
 )
 
+
 type Entry struct {
 	keySize uint32 // 4
 	valSize uint32 // 4
