@@ -7,6 +7,6 @@ import (
 
 func TestChash(t *testing.T) {
 	key := "li"
-	hkey := chash([]byte(key))
+	hkey := Mhash([]byte(key))
 	fmt.Println(hkey)
 }

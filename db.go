@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/cckvlbs/dep/index"
 )
@@ -47,6 +48,25 @@ func OpenDb(dir string) *DB {
 
 	return db
 }
+func (db *DB)NewBatch() *Batch {
+	b := &Batch{
+		lock: sync.RWMutex{},
+		db: db,   // 这里什么时候赋值
+		pendingOps: make(map[uint32]*Op),
+		state:PENDING,
+	}
+	return b
+}
+//func NewBatch() *Batch {
+//	b := &Batch{
+//		lock: sync.RWMutex{},
+//		db: OpenDb("/tmp/cckv"),   这里什么时候赋值
+//		pendingOps: make(map[uint32]*Op),
+//		state:PENDING,
+//	}
+//	return b
+//}
+
 // db建立索引
 func (db *DB)loadIndex() error {
 	if db.dFile.pos == 0 {
