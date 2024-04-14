@@ -55,3 +55,8 @@ func TestDB_Merge(t *testing.T) {
 	et2 := db.Get([]byte("mydb"))
 	fmt.Println(et2)
 }
+
+func TestTempDir(t *testing.T) {
+	dir := TempDir()
+	fmt.Println(dir)
+}

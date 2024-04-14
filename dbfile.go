@@ -3,6 +3,7 @@ package cckv
 import (
 	"errors"
 	"fmt"
+	"github.com/cckvlbs/dep/index"
 	"os"
 )
 
@@ -88,4 +89,41 @@ func (dbFile *DbFile) ReadFile(pos int) (error, *Entry) {
 func (dbFile *DbFile) Close() {
 	dbFile.file.Close()
 	return
+}
+
+func NewFileRead(dbFile *DbFile) *fileReader {
+	fr := &fileReader{
+		file: dbFile,
+		readPos: 0,
+	}
+	return fr
+}
+
+type fileReader struct {
+	file *DbFile
+	readPos int
+}
+// return , value, posInfo, err
+func (fr *fileReader) next() (error, *Entry, *index.PosInfo) {
+	//for {
+		err, et := fr.file.ReadFile(fr.readPos) // 读取所有数据
+		if err != nil {
+			return err, nil, nil
+			//if err == io.EOF {
+			//
+			//} else {
+			//
+			//}
+		}
+		retPosInfo := &index.PosInfo{Pos: fr.readPos}
+		fr.readPos += et.Size()
+
+		return nil, et, retPosInfo
+		//if et.mask == 1 {
+		//	db.index.Put(et.key, &index.PosInfo{Pos: pos})
+		//	//db.index[string(et.key)] = pos
+		//}
+		//
+		//pos += et.Size()
+	//}
 }

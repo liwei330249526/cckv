@@ -10,6 +10,16 @@ import (
 	"github.com/cckvlbs/dep/index"
 )
 
+const (
+	DataFileSuffix = ".data" // 数据文件后缀
+)
+
+// TempDir 获取一个临时目录
+func TempDir() string {
+	path,_ := os.MkdirTemp("", "cckv_temp")
+	return path
+}
+
 type DB struct {
 	dFile *DbFile
 	index index.Index
@@ -19,7 +29,7 @@ type DB struct {
 // OpenDb 打开db
 func OpenDb(dir string) *DB {
 	_, err := os.Stat(dir)
-	if err != nil && os.IsNotExist(err) { // 如果dir不存在， 则创建
+	if err != nil && os.IsNotExist(err) { // 如果dir不存在， 则创建dir
 		err = os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			fmt.Errorf("dir err %s\n", err)
@@ -75,25 +85,39 @@ func (db *DB)loadIndex() error {
 	}
 
 	// 读取所有数据，根据数据建立索引
-	pos := 0
+	fr := NewFileRead(db.dFile)
 	for {
-		err, et := db.dFile.ReadFile(pos) // 读取所有数据
-		if err != nil {
-			if err == io.EOF {
-				break
-			} else {
-				return err
-			}
-
+		err, et, psIf := fr.next()
+		if err == io.EOF {
+			break
 		}
-
 		if et.mask == 1 {
-			db.index.Put(et.key, &index.PosInfo{Pos: pos})
+			db.index.Put(et.key, psIf)
+			//db.index.Put(et.key, &index.PosInfo{Pos: pos})
 			//db.index[string(et.key)] = pos
 		}
-
-		pos += et.Size()
 	}
+
+	//
+	//pos := 0
+	//for {
+	//	err, et := db.dFile.ReadFile(pos) // 读取所有数据
+	//	if err != nil {
+	//		if err == io.EOF {
+	//			break
+	//		} else {
+	//			return err
+	//		}
+	//
+	//	}
+	//
+	//	if et.mask == 1 {
+	//		db.index.Put(et.key, &index.PosInfo{Pos: pos})
+	//		//db.index[string(et.key)] = pos
+	//	}
+	//
+	//	pos += et.Size()
+	//}
 	// maybe there add pos to dFile.pos
 	return nil
 }
