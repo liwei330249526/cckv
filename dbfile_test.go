@@ -6,7 +6,7 @@ import (
 )
 
 func TestDbFile(t *testing.T) {
-	dbFile := OpenFile("/tmp/cckv/cckv.data")
+	dbFile := OpenFile("/tmp/cckv")
 
 	if dbFile == nil {
 		return
@@ -17,7 +17,7 @@ func TestDbFile(t *testing.T) {
 	et := NewEntry([]byte(key), []byte(val))
 	et.mask = 1
 
-	err := dbFile.WriteFile(et)
+	err, posInf1 := dbFile.WriteFile(et)
 	if err != nil {
 		return
 	}
@@ -26,19 +26,19 @@ func TestDbFile(t *testing.T) {
 	val2 := "cckv2"
 	et2:= NewEntry([]byte(key2), []byte(val2))
 	et2.mask = 1
-	err = dbFile.WriteFile(et2)
+	err, posInf2 := dbFile.WriteFile(et2)
 	if err != nil {
 		return
 	}
 	pos := 0
-	err, resEt1 := dbFile.ReadFile(pos)
+	err, resEt1 := dbFile.ReadFile(posInf1)
 	if resEt1 == nil {
 		return
 	}
 
 	pos += resEt1.Size()
 
-	err, resEt2 := dbFile.ReadFile(pos)
+	err, resEt2 := dbFile.ReadFile(posInf2)
 	if resEt2 == nil {
 		return
 	}

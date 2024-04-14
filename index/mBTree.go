@@ -7,6 +7,7 @@ import (
 )
 // 索引条目结构
 type PosInfo struct {
+	FileId int
 	Pos int
 }
 
