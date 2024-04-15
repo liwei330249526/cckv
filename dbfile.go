@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cckvlbs/dep/index"
+	"io"
 	"os"
 	"path"
 	"sort"
@@ -119,6 +120,9 @@ func OpenFile(dir string) *DbFiles {
 	//2 如果文件数为0， 则新建 1.data
 	if len(dirEntrys) == 0 {
 		atDbf := opFile(0)
+		if atDbf == nil {
+			fmt.Errorf("new file err %s\n", err)
+		}
 		dbFile.activeFile = atDbf
 		//dbFile.pos = int(fInf.Size())
 		//dbFile.activeFile.file = file
@@ -137,8 +141,11 @@ func OpenFile(dir string) *DbFiles {
 		sort.Ints(ids)
 		for i := 0; i < len(ids); i++ {
 			var oldDbf *DbFileElement
+			oldDbf = opFile(i)
+			if oldDbf == nil {
+				fmt.Errorf("new file err %s\n", err)
+			}
 			if i != len(ids)-1 {
-				oldDbf = opFile(i)
 				dbFile.oldFiles = append(dbFile.oldFiles, oldDbf)
 			} else {
 				dbFile.activeFile = oldDbf
@@ -261,7 +268,7 @@ func NewFileRead(dbFile *DbFileElement) *fileReader {
 // 一个文件的读取器，包含文件句柄，和读pos， 通过next 函数去遍历文件的所有 entry
 type fileReader struct {
 	file *DbFileElement // 这个文件
-	readPos int // 从这里读取
+	readPos int // 读取器从这里读取
 }
 // return , value, posInfo, err
 func (fr *fileReader) next() (error, *Entry, *index.PosInfo) {
@@ -288,17 +295,46 @@ func (fr *fileReader) next() (error, *Entry, *index.PosInfo) {
 	//}
 }
 
-// 多个文件的读取器，一次遍历数组中的所有文件读取器，去读取所有文件的entry
-type fileReaders struct {
+// FileReaders 多个文件的读取器，一次遍历数组中的所有文件读取器，去读取所有文件的entry
+type FileReaders struct {
 	fileReaders []*fileReader
 	id int
 }
-// todo： 暂时先不写
-//func newfileReaders(dbFile *DbFiles) {
-//	fs := &fileReaders{}
-//	for i := 0; i < len(dbFile.oldFiles); i++ {
-//		NewFileRead()
-//		fs.fileReaders = append(fs.fileReaders, dbFile.oldFiles[i])
-//	}
-//}
+
+// NewfileReaders 新建多文件读取器
+func NewfileReaders(dbFile *DbFiles) *FileReaders {
+	//1 从 DbFile ，获取所有的 DbFileElement，构造对应的 reader， 加入到 fileReaders 中
+
+	fs := &FileReaders{}
+	for i := 0; i < len(dbFile.oldFiles); i++ {
+		fr := NewFileRead(dbFile.oldFiles[i])
+		fs.fileReaders = append(fs.fileReaders, fr)
+	}
+
+	fr := NewFileRead(dbFile.activeFile)
+	fs.fileReaders = append(fs.fileReaders, fr)
+
+	//2 对 fileReaders 按照 fildId排序，返回
+	sort.Slice(fs.fileReaders, func(i, j int) bool {
+		return fs.fileReaders[i].file.fileId < fs.fileReaders[i].file.fileId
+	})
+
+	return fs
+}
+
+func (fs *FileReaders)Next() (error, *Entry, *index.PosInfo) {
+	//1 如果readId 超出了最大，则返回 io.EOF
+	if fs.id >= len(fs.fileReaders) {
+		return io.EOF, nil, nil
+	}
+
+	//2 通过readId的 fileReader 读取一个 entry 返回，
+	//3 如果 read 返回 io.EOF, 则增大 readerId, 即可
+	err, et, psIf := fs.fileReaders[fs.id].next()
+	if err == io.EOF {
+		fs.id++
+		err, et, psIf = fs.Next()
+	}
+	return err, et, psIf
+}
 

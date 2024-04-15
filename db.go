@@ -77,7 +77,7 @@ func (db *DB)NewBatch() *Batch {
 //}
 
 // db建立索引
-func (db *DB)loadIndex() error {
+func (db *DB)loadIndex_version1() error {
 	if db.dFile.activeFile.pos == 0 {
 		fmt.Errorf("file pos is 0")
 		return nil
@@ -134,6 +134,30 @@ func (db *DB)loadIndex() error {
 	//	pos += et.Size()
 	//}
 	// maybe there add pos to dFile.pos
+	return nil
+}
+
+// 利用 FileReaders 迭代器重建所有数据的索引
+func (db *DB)loadIndex() error {
+	if db.dFile.activeFile.pos == 0 {
+		fmt.Errorf("file pos is 0")
+		return nil
+	}
+	// 读取所有数据，根据数据建立索引， 顺序问题，先读old， 再读active，对吗？
+	reader := NewfileReaders(db.dFile)
+	for {
+		err, et, psIf := reader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break // 不会返回错误
+			}
+			return err
+		}
+
+		if et.mask == 1 {
+			db.index.Put(et.key, psIf)
+		}
+	}
 	return nil
 }
 
