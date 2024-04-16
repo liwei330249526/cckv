@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 )
 
@@ -16,6 +17,16 @@ type DbFileElement struct {
 	fileId  int
 	file *os.File
 	pos int // write 从这里写
+}
+
+func DataPath(dir string, id int) string {
+	dataPath := path.Join(dir, fmt.Sprintf("cckv%d.data", id))
+	return dataPath
+}
+
+func DataMergePath(dir string, id int) string {
+	dataPath := filepath.Join(dir,"merge", fmt.Sprintf("cckv%d.data", id))
+	return dataPath
 }
 
 // WriteFile 写 entry 到文件的 pos
@@ -100,7 +111,7 @@ func OpenFile(dir string) *DbFiles {
 	}
 
 	opFile := func (id int) *DbFileElement {
-		dataPath := path.Join(dir, fmt.Sprintf("cckv%d.data", id))
+		dataPath := DataPath(dir, id)
 		file, err := os.OpenFile(dataPath, os.O_RDWR|os.O_CREATE, 0666) // exist err
 		if err != nil {
 			fmt.Errorf("new file err %s\n", err)
@@ -134,7 +145,7 @@ func OpenFile(dir string) *DbFiles {
 			id := 0
 			_, err := fmt.Sscanf(dirEntrys[i].Name(),"cckv%d.data", &id)
 			if err != nil {
-				return nil
+				continue
 			}
 			ids = append(ids, id)
 		}
@@ -171,6 +182,34 @@ func OpenFile(dir string) *DbFiles {
 	//dbFile.pos = int(fInf.Size())
 	//dbFile.activeFile.file = file
 	return dbFile
+}
+
+// 新建一个新的active 文件，应该 dbFile 的逻辑
+// 新建一个actviefile，将老的放入oldFiles集合。
+func (df *DbFiles)OpenNewActiveFile(dir string) {
+	//新建一个actviefile，将老的放入oldFiles集合。
+	opFile := func (id int) *DbFileElement {
+		dataPath := DataPath(dir, id)
+		file, err := os.OpenFile(dataPath, os.O_RDWR|os.O_CREATE, 0666) // exist err
+		if err != nil {
+			fmt.Errorf("new file err %s\n", err)
+			return nil
+		} // how do open a exist file, bug no err
+		// add len of file
+		fInf, err := os.Stat(dataPath)
+		if err != nil{
+			fmt.Errorf("Stat file err %s\n", err)
+			return nil
+		}
+		dbf := &DbFileElement{fileId: id, file: file, pos: int(fInf.Size())}
+		//dbFile.activeFile = dbf
+		return dbf
+	}
+
+	newActive := opFile(df.activeFile.fileId+1)
+	df.oldFiles = append(df.oldFiles, df.activeFile)
+	df.activeFile = newActive
+	return
 }
 
 // WriteFile 向文件写一个 entry
@@ -252,8 +291,14 @@ func (dbFile *DbFiles) ReadFile(pos *index.PosInfo) (error, *Entry) {
 	//return nil, entry
 }
 
+// DbFiles 关闭
 func (dbFile *DbFiles) Close() {
-	dbFile.activeFile.file.Close()
+	for i := 0; i < len(dbFile.oldFiles); i++ {
+		of := dbFile.oldFiles[i]
+		of.Close()
+	}
+	dbFile.oldFiles = nil
+	dbFile.activeFile.Close()
 	return
 }
 

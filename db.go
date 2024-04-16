@@ -1,9 +1,13 @@
 package cckv
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/cckvlbs/dep/index"
@@ -57,6 +61,13 @@ func OpenDb(dir string) *DB {
 
 	return db
 }
+
+func (db *DB)DropDB() {
+	db.Close()
+	os.RemoveAll(db.dir)
+	return
+}
+
 func (db *DB)NewBatch() *Batch {
 	b := &Batch{
 		lock: sync.RWMutex{},
@@ -209,8 +220,9 @@ func (db *DB)Del(key []byte) {
 	//delete(db.index, string(key))
 	//db.index[string(key)] = pos // 建立索引
 }
-// 日志追加写的，需要定期merge冗余数据
-//func (db *DB)Merge() error {
+//
+////日志追加写的，需要定期merge冗余数据
+//func (db *DB)Merge_version1() error {
 //	// new file
 //	path := db.dFile.activeFile.file.Name()
 //	patht := path+"t"
@@ -278,3 +290,110 @@ func (db *DB)Del(key []byte) {
 //
 //	return nil
 //}
+
+// Merge 日志追加写的，需要定期merge冗余数据
+func (db *DB)Merge() error {
+	//1 记录activeFileId，用于后续处理
+	//preFileId := db.dFile.activeFile.fileId
+
+	//2 新建一个activeFile， actvieFile 要syn后，新建一个actviefile，将老的放入oldFiles集合。
+	db.dFile.activeFile.file.Sync()
+	db.dFile.OpenNewActiveFile(db.dir)
+
+	//3 打开一个 mergeDb
+	mergeDb := OpenDb(filepath.Join(db.dir, "merge"))
+
+	//3 通过fileReaders 获取old 库的所有数据，写入到mergeDb
+	// 读取所有数据
+	reader := NewfileReaders(db.dFile)
+	for {
+		err, et, psIf := reader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break // 不会返回错误
+			}
+			return err
+		}
+		// 如果是 put操作
+		if et.mask == OPPUT {
+			// 获取old库的索引
+			posInfInIndex := db.index.Get(et.key)
+			if posInfInIndex == nil {
+				continue
+			}
+			// 如果数据是最新的数据,则写入mergeDb，且写索引
+			if psIf.FileId == posInfInIndex.FileId &&
+				psIf.Pos == posInfInIndex.Pos {
+				err, _ := mergeDb.dFile.WriteFile(et)
+				if err != nil {
+					return err
+				}
+				// 无需建立索引，mergeDb 这里只是为了操作merge file
+				//mergeDb.index.Put(et.key, posInf) // 建立索引
+			}
+		}
+	}
+
+	//4 打开 merge 的mergeDbfiles, mergeDbfiles 写入一个 mergefinished 标记（t
+	//odo） mergeDbfiles 关闭（todo）
+
+	//5 加载 mergeDbfiles , 将所有merge dir 目录下的文件copy 到db 工作目录下
+	//5 todo：先关闭old 的所有文件，删除old 目录下的所有文件
+
+	//os.ReadDir()
+	fileNames, _ := ioutil.ReadDir(db.dir)
+	for _, fileName := range fileNames {
+		if !strings.HasSuffix(fileName.Name(), ".data") {
+			continue
+		}
+		os.Remove(filepath.Join(db.dir, fileName.Name()))
+	}
+
+	// 移动文件
+	moveFile := func(src string, dest string) error {
+		err := os.Rename(src, dest)
+		return err
+	}
+
+	for i := 0; i < len(mergeDb.dFile.oldFiles); i++ {
+		//path.Join(dir, fmt.Sprintf("cckv%d.data", id))
+		src := DataMergePath(db.dir, i)
+		//src := filepath.Join(db.dir,"merge", fmt.Sprintf("cckv%d.data", i))
+		_, err := os.Stat(src)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Merge state err %s\n", err))
+		}
+
+		dst := filepath.Join(db.dir, fmt.Sprintf("cckv%d.data", i))
+		moveFile(src, dst)
+	}
+	db.Close()
+	src := DataMergePath(db.dir, mergeDb.dFile.activeFile.fileId)
+	dst := DataPath(db.dir, mergeDb.dFile.activeFile.fileId)
+	moveFile(src, dst)
+
+	//重新打开   mergeDbfiles
+
+	file := OpenFile(db.dir) // 打开文件
+	if file == nil {
+		fmt.Errorf("open file err")
+		return nil
+	}
+
+	db.dFile = file
+	db.index = index.NewMBTree()
+
+	// 加载索引
+	err := db.loadIndex()
+	if err != nil {
+		return err
+	}
+	return nil
+	//重新新建索引
+	//重新加载索引
+}
+
+func (db *DB) Close() {
+	db.dFile.Close()
+	return
+}
