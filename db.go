@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cckvlbs/dep/index"
+	"github.com/liwei330249526/cckv/index"
 )
 
 const (

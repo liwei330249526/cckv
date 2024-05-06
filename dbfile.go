@@ -3,7 +3,7 @@ package cckv
 import (
 	"errors"
 	"fmt"
-	"github.com/cckvlbs/dep/index"
+	"github.com/liwei330249526/cckv/index"
 	"hash/crc32"
 	"io"
 	"os"

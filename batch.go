@@ -2,7 +2,7 @@ package cckv
 
 import (
 	"errors"
-	"github.com/cckvlbs/dep/utils"
+	"github.com/liwei330249526/cckv/utils"
 	"sync"
 )
 
