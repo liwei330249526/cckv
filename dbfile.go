@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cckvlbs/dep/index"
+	"hash/crc32"
 	"io"
 	"os"
 	"path"
@@ -65,7 +66,10 @@ func (d *DbFileElement)ReadFile(pos int) (error, *Entry){
 	entry := DeCode(headBuf)
 	reskey := make([]byte, entry.keySize)
 	resval := make([]byte, entry.valSize)
-
+	c32 := crc32.ChecksumIEEE(resval)
+	if c32 != entry.crc32 {
+		panic("c32 not match")
+	}
 	if entry.keySize != 0 {
 		_, err = d.file.ReadAt(reskey, int64(pos))
 		if err != nil {
@@ -327,7 +331,7 @@ func (fr *fileReader) next() (error, *Entry, *index.PosInfo) {
 			//
 			//}
 		}
-		retPosInfo := &index.PosInfo{Pos: fr.readPos}
+		retPosInfo := &index.PosInfo{FileId: fr.file.fileId, Pos: fr.readPos}
 		fr.readPos += et.Size()
 
 		return nil, et, retPosInfo

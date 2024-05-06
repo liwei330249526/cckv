@@ -1,13 +1,18 @@
 package cckv
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"hash/crc32"
+)
 
 var (
-	EntryHeadSize = 10
+	EntryHeadSize = 18
 )
 
 
 type Entry struct {
+	crc32   uint32 // 4
+	txnId   uint32 // 4
 	keySize uint32 // 4
 	valSize uint32 // 4
 	mask uint16 // 2
@@ -41,9 +46,12 @@ func EnCode(entry *Entry) []byte {
 	//binary.BigEndian.AppendUint32(buf[4:], entry.keySize)
 	//binary.BigEndian.AppendUint16(buf[8:], entry.mask)
 
-	binary.BigEndian.PutUint32(buf, entry.keySize)
-	binary.BigEndian.PutUint32(buf[4:], entry.valSize)
-	binary.BigEndian.PutUint16(buf[8:], entry.mask)
+	c32 := crc32.ChecksumIEEE(entry.value)
+	binary.BigEndian.PutUint32(buf, c32)
+	binary.BigEndian.PutUint32(buf, entry.txnId)
+	binary.BigEndian.PutUint32(buf[8:], entry.keySize)
+	binary.BigEndian.PutUint32(buf[12:], entry.valSize)
+	binary.BigEndian.PutUint16(buf[16:], entry.mask)
 
 	copy(buf[uint32(EntryHeadSize):], entry.key)
 	copy(buf[uint32(EntryHeadSize)+entry.keySize:],entry.value)
@@ -53,9 +61,10 @@ func EnCode(entry *Entry) []byte {
 // DeCode 将 []byte 解码为entry，注意只有头部的10字节
 func DeCode(buf []byte) *Entry {
 	et := &Entry{
-		keySize: binary.BigEndian.Uint32(buf),
-		valSize: binary.BigEndian.Uint32(buf[4:]),
-		mask: binary.BigEndian.Uint16(buf[8:]),
+		crc32: binary.BigEndian.Uint32(buf),
+		keySize: binary.BigEndian.Uint32(buf[8:]),
+		valSize: binary.BigEndian.Uint32(buf[12:]),
+		mask: binary.BigEndian.Uint16(buf[16:]),
 	}
 	return et
 }
