@@ -206,6 +206,28 @@ func (db *DB)Get(key []byte) *Entry {
 	return resEt
 }
 
+// 获取值
+func (db *DB)GetVal(key []byte) []byte {
+	et := db.Get(key)
+	if et == nil {
+		return nil
+	}
+	return et.value
+}
+
+// 对key 追加数据
+func (db *DB)Append(key []byte, val []byte) {
+	et := db.Get(key)
+	if et == nil {
+		fmt.Println("Append err, get err")
+		return
+	}
+	newVal := append(et.value, val...)
+
+	db.Put(key, newVal)
+	return
+}
+
 // Del 删除key
 func (db *DB)Del(key []byte) {
 	et := NewEntry([]byte(key), []byte{})

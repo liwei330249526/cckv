@@ -71,7 +71,7 @@ func (b *Batch) Get(key []byte) ([]byte, error) {
 	if ov == nil {
 		return nil, errors.New("key not exist")
 	}
-	return ov.value, nil
+	return ov, nil
 }
 
 // Delete 删除

@@ -103,8 +103,8 @@ type DbFiles struct {
 	oldFiles []*DbFileElement
 }
 
-// OpenFile 打开一个文件， 如果不存在，则新建
-func OpenFile(dir string) *DbFiles {
+// OpenFiles 打开u ， 如果不存在，则新建
+func OpenFiles(dir string) *DbFiles {
 	// DBFile 对象
 	dbFile := &DbFiles{}
 
