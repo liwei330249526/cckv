@@ -3,6 +3,7 @@ package lruCache
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -25,9 +26,9 @@ func TestLruCache_Get(t *testing.T) {
 	lru.Set([]byte("k-2"), []byte("bbb"))
 
 	v, ok := lru.Get([]byte("k-1"))
-	t.Log(string(v), ok)
+	t.Log(string(v), ok) // expect ssss
 
-	v1, ok := lru.Get([]byte("k-2"))
+	v1, ok := lru.Get([]byte("k-2")) // expect bbb
 	t.Log(string(v1), ok)
 }
 
@@ -44,8 +45,13 @@ func TestLruCache_Remove(t *testing.T) {
 		lru.Set([]byte("1"), []byte("1"))
 		lru.Remove([]byte("1"))
 
-		assert.Equal(t, lru.cacheList.Len(), 0)
-		assert.Equal(t, len(lru.cacheMap), 0)
+		if lru.cacheList.Len()!= 0 {
+			t.Errorf("lru.cacheList.Len expect 0")
+		}
+
+		if len(lru.cacheMap) != 0 {
+			t.Errorf("len(lru.cacheMap) expect 0")
+		}
 	})
 
 	t.Run("2", func(t *testing.T) {
@@ -53,12 +59,14 @@ func TestLruCache_Remove(t *testing.T) {
 		lru.Set([]byte("2233"), []byte("aa"))
 
 		lru.Remove([]byte("100"))
-		assert.Equal(t, lru.cacheList.Len(), 2)
-		assert.Equal(t, len(lru.cacheMap), 2)
+		if lru.cacheList.Len() != 2 && len(lru.cacheMap) != 2 {
+			t.Errorf("cacheList len expect 2, and cacheMap len expect 2")
+		}
 
 		lru.Remove([]byte("22"))
-		assert.Equal(t, lru.cacheList.Len(), 1)
-		assert.Equal(t, len(lru.cacheMap), 1)
+		if lru.cacheList.Len() != 1 && len(lru.cacheMap) != 1 {
+			t.Errorf("cacheList len expect 1, and cacheMap len expect 1")
+		}
 	})
 
 	t.Run("3", func(t *testing.T) {
@@ -118,5 +126,8 @@ func GetValue() []byte {
 	for i := 0; i < 12; i++ {
 		str.WriteByte(alphabet[rand.Int()%26])
 	}
-	return []byte("test_val-" + strconv.FormatInt(time.Now().UnixNano(), 10) + str.String())
+	// 前缀， 时间转为10进制int， 12个无序字符
+	ret := []byte("test_val-" + strconv.FormatInt(time.Now().UnixNano(), 10) + str.String())
+	strR := string(ret)
+	return []byte(strR)
 }
