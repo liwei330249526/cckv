@@ -3,6 +3,7 @@ package cckv
 import (
 	"errors"
 	"fmt"
+	"github.com/liwei330249526/cckv/lruCache"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,6 +16,8 @@ import (
 
 const (
 	DataFileSuffix = ".data" // 数据文件后缀
+
+	CecheSizeDefalut = 500
 )
 
 // TempDir 获取一个临时目录
@@ -27,10 +30,11 @@ type DB struct {
 	dFile *DbFiles
 	index index.Index
 	dir string
+	cache *lruCache.LruCache
 }
 
 // OpenDb 打开db
-func OpenDb(dir string) *DB {
+func OpenDb(dir string, cacheSize int) *DB {
 	_, err := os.Stat(dir)
 	if err != nil && os.IsNotExist(err) { // 如果dir不存在， 则创建dir
 		err = os.MkdirAll(dir, os.ModePerm)
@@ -40,7 +44,7 @@ func OpenDb(dir string) *DB {
 		}
 	}
 
-	file := OpenFile(dir) // 打开文件
+	file := OpenFiles(dir) // 打开文件
 	if file == nil {
 		fmt.Errorf("open file err")
 		return nil
@@ -52,6 +56,7 @@ func OpenDb(dir string) *DB {
 		//index: index.NewMMap(),
 		index: index.NewMBTree(),
 		dir: dir,
+		cache : lruCache.NewLruCache(cacheSize),
 	}
 	// 加载索引
 	err = db.loadIndex()
@@ -185,13 +190,18 @@ func (db *DB)Put(key []byte, val []byte) {
 	//db.index.Put(key, &index.PosInfo{Pos: pos})
 	//db.index[string(key)] = pos // 建立索引
 	db.index.Put(key, posInf) // 建立索引
+	db.cache.Set(key, val)
 	return
 }
 
 // Get db获取
 // 问题， db这里怎么知道读结束了？
 //  1 通过返回了nil， 或 加一个err 返回值
-func (db *DB)Get(key []byte) *Entry {
+func (db *DB)Get(key []byte) []byte {
+	if val, ok := db.cache.Get(key); ok {
+		return val
+	}
+
 	if db.index.Get(key) == nil {
 		return nil
 	}
@@ -203,28 +213,21 @@ func (db *DB)Get(key []byte) *Entry {
 		return nil
 	}
 
-	return resEt
+	return resEt.value
 }
 
-// 获取值
-func (db *DB)GetVal(key []byte) []byte {
-	et := db.Get(key)
-	if et == nil {
-		return nil
-	}
-	return et.value
-}
 
 // 对key 追加数据
 func (db *DB)Append(key []byte, val []byte) {
-	et := db.Get(key)
-	if et == nil {
+	v := db.Get(key)
+	if v == nil {
 		fmt.Println("Append err, get err")
 		return
 	}
-	newVal := append(et.value, val...)
+	newVal := append(v, val...)
 
 	db.Put(key, newVal)
+	db.cache.Set(key, val)
 	return
 }
 
@@ -239,6 +242,7 @@ func (db *DB)Del(key []byte) {
 	}
 
 	db.index.Delete(key)
+	db.cache.Remove(key)
 	//delete(db.index, string(key))
 	//db.index[string(key)] = pos // 建立索引
 }
@@ -323,7 +327,7 @@ func (db *DB)Merge() error {
 	db.dFile.OpenNewActiveFile(db.dir)
 
 	//3 打开一个 mergeDb
-	mergeDb := OpenDb(filepath.Join(db.dir, "merge"))
+	mergeDb := OpenDb(filepath.Join(db.dir, "merge"), CecheSizeDefalut)
 
 	//3 通过fileReaders 获取old 库的所有数据，写入到mergeDb
 	// 读取所有数据
@@ -396,7 +400,7 @@ func (db *DB)Merge() error {
 
 	//重新打开   mergeDbfiles
 
-	file := OpenFile(db.dir) // 打开文件
+	file := OpenFiles(db.dir) // 打开文件
 	if file == nil {
 		fmt.Errorf("open file err")
 		return nil

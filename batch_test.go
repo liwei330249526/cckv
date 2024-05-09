@@ -6,7 +6,7 @@ import (
 )
 
 func TestBatch(t *testing.T) {
-	db := OpenDb("/tmp/cckv") // 新建db
+	db := OpenDb("/tmp/cckv", CecheSizeDefalut) // 新建db
 	if db == nil {
 		return
 	}
@@ -48,7 +48,7 @@ func TestBatch(t *testing.T) {
 }
 
 func TestBatch_Rollback(t *testing.T) {
-	db := OpenDb("/tmp/cckv") // 新建db
+	db := OpenDb("/tmp/cckv", CecheSizeDefalut) // 新建db
 	if db == nil {
 		return
 	}

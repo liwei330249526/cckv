@@ -23,6 +23,8 @@ type Entry struct {
 // NewEntry 新建 entry
 func NewEntry(key []byte, val []byte) *Entry {
 	e := &Entry{
+		crc32: crc32.ChecksumIEEE(val),
+		txnId: 1,
 		keySize: uint32(len(key)),
 		valSize: uint32(len(val)),
 		key:     key,
@@ -46,9 +48,10 @@ func EnCode(entry *Entry) []byte {
 	//binary.BigEndian.AppendUint32(buf[4:], entry.keySize)
 	//binary.BigEndian.AppendUint16(buf[8:], entry.mask)
 
-	c32 := crc32.ChecksumIEEE(entry.value)
-	binary.BigEndian.PutUint32(buf, c32)
-	binary.BigEndian.PutUint32(buf, entry.txnId)
+	//c32 := crc32.ChecksumIEEE(entry.value)
+	binary.BigEndian.PutUint32(buf, entry.crc32)
+	//binary.BigEndian.PutUint32(buf[4:], entry.txnId)
+	binary.BigEndian.PutUint32(buf[4:], entry.txnId)
 	binary.BigEndian.PutUint32(buf[8:], entry.keySize)
 	binary.BigEndian.PutUint32(buf[12:], entry.valSize)
 	binary.BigEndian.PutUint16(buf[16:], entry.mask)
@@ -62,6 +65,7 @@ func EnCode(entry *Entry) []byte {
 func DeCode(buf []byte) *Entry {
 	et := &Entry{
 		crc32: binary.BigEndian.Uint32(buf),
+		txnId: binary.BigEndian.Uint32(buf[4:]),
 		keySize: binary.BigEndian.Uint32(buf[8:]),
 		valSize: binary.BigEndian.Uint32(buf[12:]),
 		mask: binary.BigEndian.Uint16(buf[16:]),

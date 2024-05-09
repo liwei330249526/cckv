@@ -6,7 +6,7 @@ import (
 )
 
 func TestDbFile(t *testing.T) {
-	dbFile := OpenFile("/tmp/cckv")
+	dbFile := OpenFiles("/tmp/cckv")
 
 	if dbFile == nil {
 		return

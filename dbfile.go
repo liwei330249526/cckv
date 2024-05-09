@@ -66,10 +66,7 @@ func (d *DbFileElement)ReadFile(pos int) (error, *Entry){
 	entry := DeCode(headBuf)
 	reskey := make([]byte, entry.keySize)
 	resval := make([]byte, entry.valSize)
-	c32 := crc32.ChecksumIEEE(resval)
-	if c32 != entry.crc32 {
-		panic("c32 not match")
-	}
+
 	if entry.keySize != 0 {
 		_, err = d.file.ReadAt(reskey, int64(pos))
 		if err != nil {
@@ -88,6 +85,12 @@ func (d *DbFileElement)ReadFile(pos int) (error, *Entry){
 		}
 		pos += int(entry.valSize)
 		entry.value = resval
+	}
+
+	c32 := crc32.ChecksumIEEE(resval)
+	if c32 != entry.crc32 {
+		fmt.Println(entry)
+		panic(fmt.Sprintf("c32 not match %d != %d ", c32, entry.crc32))
 	}
 	return nil, entry
 }
