@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/liwei330249526/cckv/index"
 )
@@ -18,6 +19,13 @@ const (
 	DataFileSuffix = ".data" // 数据文件后缀
 
 	CecheSizeDefalut = 500
+
+	MergeInterval = time.Second * 60
+)
+
+var (
+	ErrMerging = errors.New("db is merging")
+
 )
 
 // TempDir 获取一个临时目录
@@ -27,10 +35,12 @@ func TempDir() string {
 }
 
 type DB struct {
-	dFile *DbFiles
-	index index.Index
-	dir string
-	cache *lruCache.LruCache
+	mu      sync.RWMutex
+	dFile   *DbFiles
+	index   index.Index
+	dir     string
+	cache   *lruCache.LruCache
+	merging bool
 }
 
 // OpenDb 打开db
@@ -321,7 +331,16 @@ func (db *DB)Del(key []byte) {
 func (db *DB)Merge() error {
 	//1 记录activeFileId，用于后续处理
 	//preFileId := db.dFile.activeFile.fileId
+	db.mu.Lock()
 
+	if db.merging {
+		return ErrMerging
+	}
+
+	defer func() {
+		db.merging = false
+		db.mu.Unlock()
+	}()
 	//2 新建一个activeFile， actvieFile 要syn后，新建一个actviefile，将老的放入oldFiles集合。
 	db.dFile.activeFile.file.Sync()
 	db.dFile.OpenNewActiveFile(db.dir)
@@ -408,6 +427,7 @@ func (db *DB)Merge() error {
 
 	db.dFile = file
 	db.index = index.NewMBTree()
+	db.cache = lruCache.NewLruCache(CecheSizeDefalut)
 
 	// 加载索引
 	err := db.loadIndex()
@@ -419,7 +439,29 @@ func (db *DB)Merge() error {
 	//重新加载索引
 }
 
+// 定期merge 数据
+func (db *DB)startMerge() {
+	go func() {
+		timer := time.NewTimer(MergeInterval)
+		defer timer.Stop()
+		for {
+			select {
+			case <- timer.C:
+				timer.Reset(MergeInterval)
+				err := db.Merge()
+				if err != nil && err != ErrMerging {
+					fmt.Println("err :", err)
+					return
+				}
+			}
+		}
+	}()
+}
+
 func (db *DB) Close() {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
 	db.dFile.Close()
 	return
 }
